@@ -270,7 +270,7 @@
 #     t="$SNAP_ROOT/software/examples/snap_search -px       -i ../../fox1.txt  -t30   -v  "    ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       #### select one loop type
       # for size in {1..5}; do
-        for size in 2 30 257 1024 $rnd1k4k; do to=$((size*2+200))
+        for size in 2 30 257 1024 $rnd1k4k; do to=$((size*4+400))
         #### select 1 search char
           char=$(cat /dev/urandom|tr -dc 'a-zA-Z0-9'|fold -w 1|head -n 1)                               # one random ASCII  char to search for
         # char='A'                                                                                      # one deterministic char to search for
@@ -280,7 +280,9 @@
         # dd if=/dev/urandom bs=${size} count=1 >${size}.in;                                            # random data any char, no echo due to unprintable char
         # cmd='print("A" * '${size}', end="")'; python3 -c "$cmd" >${size}.in;head ${size}.in;echo      # data generated with python
         count=$(fgrep -o $char ${size}.in|wc -l);                                                       # expected occurence of char in file
-        t="$SNAP_ROOT/software/examples/snap_search -p${char} -i${size}.in -E${count} -t$to -v";echo -e "$t $l";((n+=1));time $t;echo -e "RC=$?$del"
+        t="$SNAP_ROOT/software/examples/snap_search -m0 -p${char} -i${size}.in -E${count} -t$to -v";echo -e "$t $l";((n+=1));time $t;echo -e "RC=$?$del"
+        t="$SNAP_ROOT/software/examples/snap_search -m1 -p${char} -i${size}.in -E${count} -t$to -v";echo -e "$t $l";((n+=1));time $t;echo -e "RC=$?$del"
+        t="$SNAP_ROOT/software/examples/snap_search -m2 -p${char} -i${size}.in -E${count} -t$to -v";echo -e "$t $l";((n+=1));time $t;echo -e "RC=$?$del"
       done
     fi # hls_search
 
@@ -294,8 +296,8 @@
 
     if [[ "$t0l" == "10141005" || "${env_action}" == "hls_intersect"* ]];then echo -e "$del\ntesting intersect"
       t="$SNAP_ROOT/software/examples/snap_intersect     -h"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-      t="$SNAP_ROOT/software/examples/snap_intersect    -m1 -v -t300"                          ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-      t="$SNAP_ROOT/software/examples/snap_intersect    -n1 -v -t600"                          ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_intersect    -m1 -v -t900"                          ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_intersect    -n1 -v -t900"                          ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_intersect    -n2 -v -t1200"                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
 #     t="$SNAP_ROOT/software/examples/snap_intersect    -n4 -v -t1800"                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
 #     t="$SNAP_ROOT/software/examples/snap_intersect    -n8 -v -t3200"                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
