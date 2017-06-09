@@ -18,6 +18,10 @@
   set -e                                                # exit on error
   n=0                                                   # count amount of tests executed (exception for subsecond calls)
   loops=1;
+  rnd20=$((1+RANDOM%20))
+  rnd1k4k=$((1024+RANDOM%3072))
+  rnd16k=$((1+RANDOM%16384))
+  rnd32k=$((RANDOM))
 # export SNAP_TRACE=0xFF
   stimfile=$(basename "$0"); logfile="${stimfile%.*}.log"; ts0=$(date +%s); echo "executing $stimfile, logging $logfile maxloop=$loops";
   for((i=1;i<=loops;i++)) do l="loop=$i of $loops"; ts1=$(date +%s);                                                                                    #  sec
@@ -28,22 +32,8 @@
     vers=${r:0:6}; vers1=${r:0:2}; vers2=${r:2:2}; vers3=${r:4:2}; dist=${r:6:2};echo "SNAP version=$vers1.$vers2.$vers3 dist=$dist"
     t="$SNAP_ROOT/software/tools/snap_peek 0x8         ";     r=$($t|grep ']'|awk '{print $2}');echo -e "$t result=$r # build date 0000YYYY.MM.DD.hh.mm"
     t="$SNAP_ROOT/software/tools/snap_peek 0x10        ";     r=$($t|grep ']'|awk '{print $2}');echo -e "$t result=$r # cmdreg 0x10=exploration done"
-    done=${r:14:1};echo "exploration done=$done";
     t="$SNAP_ROOT/software/tools/snap_peek 0x18        ";     r=$($t|grep ']'|awk '{print $2}');echo -e "$t result=$r # statusreg 0x100=exploration done 1action, 0x111=2action"
     done=${r:13:1};numact=${r:14:1};(( numact += 1 ));echo "exploration done=$done num_actions=$numact"
-    if (( numact > 0 ));then
-      t="$SNAP_ROOT/software/tools/snap_peek 0x100       ";   r=$($t|grep ']'|awk '{print $2}');echo -e "$t result=$r # action0 type 0.0.0.shrt.4B_long"
-      t0s=${r:7:1};t0l=${r:8:8}
-      if   [[ $t0l == "10140000" ]];then a0="hdl_example";
-      elif [[ $t0l == "10141000" ]];then a0="hls_memcopy"
-      elif [[ $t0l == "10141001" ]];then a0="hls_sponge"
-      elif [[ $t0l == "10141002" ]];then a0="hls_hashjoin"
-      elif [[ $t0l == "10141003" ]];then a0="hls_search"
-      elif [[ $t0l == "10141004" ]];then a0="hls_bfs"
-      elif [[ $t0l == "10141005" ]];then a0="hls_intersect"
-      else a0="unknown"; fi;
-      echo "action0 type0s=$t0s type0l=$t0l $a0"
-    fi
     if [[ "$done" == "0" ]];then echo "exploration not done yet"
       env_action=$(echo $ACTION_ROOT|sed -e "s/action_examples\// /g"|awk '{print $2}');echo "ENV_action=${env_action} ${NVME_USED}"
 #     if [[ "${env_action}" == *"hdl_example"* ]];then echo -e "$del\ntesting hdl_example in master mode"
@@ -124,8 +114,6 @@
     if [[ "$t0l" == "10140000" || "${env_action}" == "hdl_example" ]];then echo -e "$del\ntesting hdl_example"
     if [[ "$NVME_USED" == "TRUE" ]];then echo -e "$del\nskipped due to NVMe"
     else
-#     t="$SNAP_ROOT/software/tools/stage1                        -v  "                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #  4..timeout endless
-#     t="$SNAP_ROOT/software/tools/stage1                 -t10   -v  "                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #e invalid option -t
 #     t="$SNAP_ROOT/software/examples/snap_example -h"                                                  ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
 #     t="$SNAP_ROOT/software/examples/snap_example                 -t100      "                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #  4..105
 #     t="$SNAP_ROOT/software/examples/snap_example     -s2 -e4 -i1 -t40       "                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #  2..33
@@ -148,7 +136,7 @@
 #     t="$SNAP_ROOT/software/examples/snap_example -a6 -z1         -t100      "                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #  6..10
       for num4k in 0 1; do
       for num64 in 1 2; do
-      for align in 4096 1024 256 64; do
+      for align in 4096 1024 256 64 $rnd1k4k; do
         t="$SNAP_ROOT/software/examples/snap_example -a2 -A${align} -S${num4k} -B${num64} -t200"        ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       done
       done
@@ -156,16 +144,16 @@
       if [[ "$DDR3_USED" == "TRUE" || "$DDR4_USED" == "TRUE" || "$BRAM_USED" == "TRUE" || "$SDRAM_USED" == "TRUE" ]]; then echo -e "$del\ntesting DDR"
         for num4k in 0 1 3; do to=$((80+num4k*80))     # irun 1=6sec, 7=20sec, xsim 1=60sec 3=150sec
         for num64 in 1 64; do                          # 1..64
-        for align in 4096 256 64; do                   # must be mult of 64
+        for align in 4096 256 64 $rnd1k4k; do          # must be mult of 64 ??
           t="$SNAP_ROOT/software/examples/snap_example -a6 -A${align} -S${num4k} -B${num64} -t$to"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
         done
         done
         done
         #### check DDR3 memory in KU3, stay under 512k for BRAM
         t="$SNAP_ROOT/software/examples/snap_example_ddr -h"                                            ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
-        for strt in 0x1000 0x2000; do      # start adr
-        for iter in 1 2; do                # number of blocks
-        for bsize in 64 0x1000; do        # block size
+        for strt in 0x1000 $rnd1k4k; do                # start adr
+        for iter in 1 2; do                            # number of blocks
+        for bsize in 64 0x1000 $rnd1k4k; do            # block size
           let end=${strt}+${iter}*${bsize}; to=$((iter*iter*bsize/4+300))                       # rough timeout dependent on filesize
           t="$SNAP_ROOT/software/examples/snap_example_ddr -s${strt} -e${end} -b${bsize} -i${iter} -t$to";echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
         done
@@ -174,7 +162,7 @@
         #### use memset in host or in fpga memory, stay under 512k for BRAM
         t="$SNAP_ROOT/software/examples/snap_example_set -h"                                            ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
         for beg in 0 11 63; do                                    # start adr
-        for size in 7 4097; do to=$((size/20+300))                                              # block size to copy, rough timeout dependent on filesize
+        for size in 7 4097 $rnd16k; do to=$((size/20+300))        # block size to copy, rough timeout dependent on filesize
           t="$SNAP_ROOT/software/examples/snap_example_set -H -b${beg} -s${size} -p${size} -t$to"       ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
           t="$SNAP_ROOT/software/examples/snap_example_set -F -b${beg} -s${size} -p${size} -t$to"       ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
         done
@@ -184,33 +172,36 @@
     fi # hdl_example
 
     if [[ "${env_action}" == "hdl_example" && "$NVME_USED" == "TRUE" ]];then echo -e "$del\ntesting nvme"
-      # write FPGA memory to prevent reading unwritten adr 0
-      t="$SNAP_ROOT/software/examples/snap_example_set  -F -b0x0 -t50"                         ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/tools/nvmeInit.py          -h"                                    ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/tools/nvmeWR.py            -h"                                    ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example      -h"                                    ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example_set  -h"                                    ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example_nvme -h"                                    ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
-
+      # write FPGA memory to prevent reading unwritten adr 0
+#     t="$SNAP_ROOT/software/examples/snap_example_set  -F -b0x0 -s8192 -p0x1 -t50"            ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_set  -F -b0x0 -s8192 -p0x1 -t50"            ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      # init FPGA drives
 #     t="$SNAP_ROOT/software/tools/nvmeInit.py          -d0"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/tools/nvmeInit.py          -db"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
 #     t="$SNAP_ROOT/software/tools/nvmeInit.py          -d1"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example      -a6           -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-
-      t="$SNAP_ROOT/software/examples/snap_example_set  -F  -b0x8000  -s0x100  -p0x5 -t50"     ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-      t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x8000  -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      # test with Python and check visually
+      t="$SNAP_ROOT/software/examples/snap_example_set  -F  -b0x8000  -s0x2000 -p0x5 -t50"     ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+#     t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x8000  -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/tools/nvmeWR.py            -d1"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x8000  -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
 
-      t="$SNAP_ROOT/software/examples/snap_example_set  -F  -b0x10000 -s0x100  -p0xA -t50"     ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-      t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x10000 -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_set  -F  -b0x10000 -s0x2000 -p0xA -t50"     ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+#     t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x10000 -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/tools/nvmeWR.py            -d0"                                   ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example      -a4 -D0x10000 -S2      -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-
+      # test with C and check automatically
       t="$SNAP_ROOT/software/examples/snap_example_nvme -d1                    -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-#     t="$SNAP_ROOT/software/examples/snap_example_nvme -d1 -b4                -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_nvme -d1 -b4                -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_nvme -d1 -b${rnd20}         -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_example_nvme -d0                    -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
-#     t="$SNAP_ROOT/software/examples/snap_example_nvme -d0 -b5                -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_nvme -d0 -b5                -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
+      t="$SNAP_ROOT/software/examples/snap_example_nvme -d0 -b${rnd20}         -t100 -vv"      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
     fi # nvme
 
     if [[ "$t0l" == "10141000" || "${env_action}" == "hls_memcopy"* ]];then echo -e "$del\ntesting snap_memcopy"
@@ -218,7 +209,7 @@
 #     t="$SNAP_ROOT/software/examples/snap_memcopy -C0 -i ../../1KB.txt -o 1KB.out -t10"       ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #  5..7
       #### select 1 selection loop
       # for size in 2 83; do                      # still error with 83B ?
-        for size in 1 2 4 8 16 32 64; do to=$((size*50+10))                                     # rough timeout dependent on filesize
+        for size in 1 2 4 8 16 32 64 $rnd1k4k; do to=$((size*50+10))
       # for size in 2 8 16 64 128 256 512 1024; do # 64B aligned       01/20/2017: error 128B issues 120, CR968181, wait for Vivado 2017.1
       # for size in 255 255 256 256 257 257 258 258 259 259 260 260; do
       # for size in 83 255 256 257 1024 1025 4095 4096 4097; do
@@ -235,8 +226,8 @@
       done
       #### select 1 selection loop
       # for size in 2 83; do                      # still error with 83B ?
-      # for size in   8 16 64; do to=$((size*5+10))                                             # rough timeout dependent on filesize
-        for size in 1 2 4 8 16 32 64; do to=$((size*50+10))                                     # rough timeout dependent on filesize
+      # for size in   8 16 64; do to=$((size*5+10))
+        for size in 1 2 4 8 16 32 64 $rnd1k4k; do to=$((size*50+10))
       # for size in 2 8 16 64 128 256 512 1024; do # 64B aligned       01/20/2017: error 128B issues 120, CR968181, wait for Vivado 2017.1
       # for size in 2 31 32 33 64 65 80 81 83 255 256 257 1024 1025 4096 4097; do
         #### select 1 checking method
@@ -259,10 +250,10 @@
     if [[ "$t0l" == "10141002" || "${env_action}" == "hls_hashjoin"* ]];then echo -e "$del\ntesting snap_hashjoin"
       t="$SNAP_ROOT/software/examples/snap_hashjoin -h"                                        ;echo -e "$t $l";                   $t;echo -e "RC=$?$del" #
       t="$SNAP_ROOT/software/examples/snap_hashjoin           -t600 -vvv"                      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" # 1m26s
-      for vart in 1 15; do to=$((vart*3+500))                                                   # rough timeout dependent on filesize
+      for vart in 1 15; do to=$((vart*3+500))
         t="$SNAP_ROOT/software/examples/snap_hashjoin -T$vart -t$to -vvv"                      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #   49s
       done
-      for varq in 1 5 32; do to=$((varq*3+500))                                                 # rough timeout dependent on filesize
+      for varq in 1 5 32; do to=$((varq*3+500))
         t="$SNAP_ROOT/software/examples/snap_hashjoin -Q$vart -t$to -vvv"                      ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #   49s
       done
     fi # hls_hashjoin
@@ -278,9 +269,8 @@
 #     t="$SNAP_ROOT/software/examples/snap_search -p.       -i ../../fox10.txt -t80   -v  "    ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
 #     t="$SNAP_ROOT/software/examples/snap_search -px       -i ../../fox1.txt  -t30   -v  "    ;echo -e "$t $l";date;((n+=1));time $t;echo -e "RC=$?$del" #
       #### select one loop type
-      # for size in 20 83; do
       # for size in {1..5}; do
-        for size in 2 20 30 31 32 33 80 81 255 256 257 1024 1025; do to=$((size*2+200))         # rough timeout dependent on filesize
+        for size in 2 30 257 1024 $rnd1k4k; do to=$((size*2+200))
         #### select 1 search char
           char=$(cat /dev/urandom|tr -dc 'a-zA-Z0-9'|fold -w 1|head -n 1)                               # one random ASCII  char to search for
         # char='A'                                                                                      # one deterministic char to search for
